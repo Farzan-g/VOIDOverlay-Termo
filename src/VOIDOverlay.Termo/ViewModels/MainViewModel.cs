@@ -44,6 +44,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ToggleCompactModeCommand = new RelayCommand(ToggleCompactMode);
         RefreshCommand = new AsyncRelayCommand(RefreshNowAsync);
         SaveSettingsCommand = new RelayCommand(SaveSettings);
+        _hardwareMonitor.SetMetricVisibility(
+            _settings.ShowCpuTemperature || _settings.ShowCpuGraph,
+            _settings.ShowGpuTemperature || _settings.ShowGpuGraph);
         _hardwareMonitor.Start(_settings.RefreshIntervalMs);
     }
 
@@ -84,6 +87,19 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public void ApplySettings(OverlaySettings settings)
     {
         Settings = settings;
+        _hardwareMonitor.SetMetricVisibility(
+            Settings.ShowCpuTemperature || Settings.ShowCpuGraph,
+            Settings.ShowGpuTemperature || Settings.ShowGpuGraph);
+        if (!Settings.ShowCpuTemperature)
+        {
+            CpuTemperatureC = null;
+        }
+
+        if (!Settings.ShowGpuTemperature)
+        {
+            GpuTemperatureC = null;
+        }
+
         _hardwareMonitor.Start(Settings.RefreshIntervalMs);
         OnPropertyChanged(nameof(CpuTemperatureText));
         OnPropertyChanged(nameof(GpuTemperatureText));
@@ -120,16 +136,23 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void ApplyReading(HardwareReading reading)
     {
-        CpuTemperatureC = reading.CpuTemperatureC;
-        GpuTemperatureC = reading.GpuTemperatureC;
+        CpuTemperatureC = Settings.ShowCpuTemperature ? reading.CpuTemperatureC : null;
+        GpuTemperatureC = Settings.ShowGpuTemperature ? reading.GpuTemperatureC : null;
         CpuLoadPercent = reading.CpuLoadPercent;
         GpuLoadPercent = reading.GpuLoadPercent;
         CpuClockGHz = reading.CpuClockGHz;
         GpuClockMHz = reading.GpuClockMHz;
         LastSampleUtc = reading.TimestampUtc;
 
-        _cpuHistory.Add(ValidTemperature(reading.CpuTemperatureC));
-        _gpuHistory.Add(ValidTemperature(reading.GpuTemperatureC));
+        if (Settings.ShowCpuGraph)
+        {
+            _cpuHistory.Add(ValidTemperature(reading.CpuTemperatureC));
+        }
+
+        if (Settings.ShowGpuGraph)
+        {
+            _gpuHistory.Add(ValidTemperature(reading.GpuTemperatureC));
+        }
 
         var intervalMs = Math.Clamp(Settings.RefreshIntervalMs, 250, 10_000);
         var maxHistory = Math.Max(2, (int)Math.Ceiling(Settings.HistorySeconds * 1000d / intervalMs));

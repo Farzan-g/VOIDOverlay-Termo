@@ -6,8 +6,9 @@ VOID Overlay Termo is an independent Windows desktop overlay for CPU and GPU tem
 
 - CPU/GPU temperature readings and rolling history charts via LibreHardwareMonitor.
 - Optional CPU/GPU load, clock, RAM, and VRAM readings when exposed by the hardware provider.
-- Transparent, topmost overlay with configurable surface, text/accent colors, font size, and content/surface opacity.
-- Six anchors, X/Y offsets, full-screen/work-area edge reference, click-through and lock controls.
+- Transparent, topmost overlay with independently configurable background, text readability, colors, font, spacing, and padding.
+- Nine coordinate presets, center-relative X/Y offsets, display selection, full-screen/work-area bounds, click-through and lock controls.
+- Independent CPU/GPU temperature and graph visibility; unused metric hardware is not sampled.
 - Per-user startup integration, settings persistence, and optional sensor/position diagnostics.
 - Missing or invalid readings display as `N/A`; values are never fabricated.
 
@@ -39,18 +40,18 @@ This creates a framework-dependent Windows x64 application in `artifacts\publish
 
 ## Tray, settings, and configuration
 
-The tray menu uses the shared order: app name, **Open Settings...**, **Show/Hide Overlay**, **Lock Position**, **Start with Windows**, **About VOID Overlay Termo**, **Exit**. Settings use General, Appearance, Position, Monitoring, and About sections.
+The tray menu uses the shared order: app name, **Open Settings...**, **Show/Hide Overlay**, **Lock Position**, **Start with Windows**, **About VOID Overlay Termo**, **Exit**. Settings use the shared General, Position, Metrics, Appearance, and About cards. Settings appearance supports System, Light, and Dark palettes.
 
-Color values use `#RRGGBB`; font size is 9–24 DIPs; X/Y offsets range from -200 to 1000 DIPs. Negative X moves left and negative Y moves up from the selected anchor. Placement is clamped to the selected display bounds. Termo follows the display containing its overlay, falling back to the primary display; edge reference can be the full monitor or taskbar-excluding work area.
+Color values use `#RRGGBB`; font size is 9–24 DIPs. X=0 and Y=0 center the overlay on the selected display; positive X/Y move right/down and negative X/Y move left/up. Numeric coordinates display up to two decimal places and synchronize with sliders. Position presets set convenient coordinates without constraining later edits. The display selector falls back to the primary display if a configured monitor is unavailable; the usable bounds can be the full monitor or taskbar-excluding work area.
 
-Settings are stored in `%LOCALAPPDATA%\VOIDOverlay\Termo\settings.json`. Legacy shared edge-margin settings migrate to the two independent offsets. Diagnostics are opt-in via `--diagnostics`; they may include hardware identifiers and readings. Review and redact diagnostic data before sharing.
+The overlay background is off by default. Temperature text and its history graph can be enabled independently for CPU and GPU; disabling both for a metric stops its hardware sampling. Settings are stored in `%LOCALAPPDATA%\VOIDOverlay\Termo\settings.json`. Legacy edge-anchored coordinates are migrated to equivalent center-relative offsets, and legacy shared edge-margin settings migrate to independent offsets. Diagnostics are opt-in via `--diagnostics`; they may include hardware identifiers and readings. Review and redact diagnostic data before sharing.
 
 ## Troubleshooting
 
 - **Temperature is `N/A`:** check device/driver support and the elevation prompt. Hardware and firmware determine sensor availability.
 - **Overlay is hidden:** use its tray visibility action or double-click the tray icon.
 - **Settings do not persist:** verify the current user can write to `%LOCALAPPDATA%\VOIDOverlay\Termo`.
-- **Position changed after a display update:** select an anchor and edge reference again; position uses the display containing the overlay.
+- **Position changed after a display update:** verify the selected display and usable-area choice; Termo clamps coordinates to the selected display's usable bounds.
 
 ## Development, structure, and licensing
 

@@ -4,8 +4,8 @@
         xmlns:controls="clr-namespace:VOIDOverlay.Controls"
         Title="VOID Overlay Termo"
         Icon="pack://application:,,,/assets/void-overlay.ico"
-        Height="62"
-        SizeToContent="Width"
+        Height="Auto"
+        SizeToContent="WidthAndHeight"
         Topmost="True"
         AllowsTransparency="True"
         Background="Transparent"
@@ -17,19 +17,19 @@
         MouseRightButtonDown="Window_MouseRightButtonDown">
 
     <Border x:Name="OverlaySurface"
-            Height="44"
+            Height="Auto"
             Background="Transparent"
             CornerRadius="5"
             Padding="10,4"
             HorizontalAlignment="Center"
             VerticalAlignment="Center">
-    <Grid Height="36" HorizontalAlignment="Center" VerticalAlignment="Center">
+    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
         <Grid.RowDefinitions>
-            <RowDefinition Height="18" />
-            <RowDefinition Height="18" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" HorizontalAlignment="Center">
+        <Grid x:Name="CpuRow" Grid.Row="0" HorizontalAlignment="Center">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
@@ -53,7 +53,7 @@
                        AutomationProperties.Name="CPU temperature" />
         </Grid>
 
-        <Grid Grid.Row="1" HorizontalAlignment="Center">
+        <Grid x:Name="GpuRow" Grid.Row="1" HorizontalAlignment="Center">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />

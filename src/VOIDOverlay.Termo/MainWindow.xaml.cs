@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media.Effects;
 using Microsoft.Win32;
 using VOIDOverlay.Models;
 using VOIDOverlay.Services;
@@ -94,15 +95,36 @@ public partial class MainWindow : Window
         var (dpiScaleX, dpiScaleY) = GetScale(targetScreen);
         var overlayWidth = ActualWidth > 0 ? ActualWidth : DesiredSize.Width;
         var overlayHeight = ActualHeight > 0 ? ActualHeight : DesiredSize.Height;
+        if (settings.PositionCoordinatesVersion == 0)
+        {
+            var migratedOffsets = OverlayPositionCalculator.MigrateLegacyOffsets(
+                ToPixelBounds(screenBounds),
+                edgeBounds,
+                dpiScaleX,
+                dpiScaleY,
+                overlayWidth,
+                overlayHeight,
+                settings.HorizontalOffsetX,
+                settings.VerticalOffsetY,
+                settings.Position);
+            settings.HorizontalOffsetX = migratedOffsets.X;
+            settings.VerticalOffsetY = migratedOffsets.Y;
+            settings.PositionCoordinatesVersion = 1;
+            if (System.Windows.Application.Current is App app)
+            {
+                app.SaveSettings();
+            }
+        }
+
         var location = OverlayPositionCalculator.Calculate(
+            ToPixelBounds(screenBounds),
             edgeBounds,
             dpiScaleX,
             dpiScaleY,
             overlayWidth,
             overlayHeight,
             settings.HorizontalOffsetX,
-            settings.VerticalOffsetY,
-            settings.Position);
+            settings.VerticalOffsetY);
 
         Left = location.Left;
         Top = location.Top;
@@ -184,14 +206,41 @@ public partial class MainWindow : Window
         OverlaySurface.Background = ParseBrush(settings.BackgroundColor, settings.BackgroundOpacity, settings.BackgroundEnabled);
         OverlaySurface.BorderBrush = System.Windows.Media.Brushes.Transparent;
         OverlaySurface.BorderThickness = new Thickness(0);
+        OverlaySurface.Padding = new Thickness(
+            settings.OverlayPadding,
+            settings.OverlayPadding / 2,
+            settings.OverlayPadding,
+            settings.OverlayPadding / 2);
         Opacity = settings.Opacity;
         Topmost = settings.AlwaysOnTop;
+        var fontFamily = new System.Windows.Media.FontFamily(settings.FontFamily);
+        CpuTemperatureTextBlock.FontFamily = fontFamily;
+        GpuTemperatureTextBlock.FontFamily = fontFamily;
         CpuTemperatureTextBlock.FontSize = settings.FontSize;
         GpuTemperatureTextBlock.FontSize = settings.FontSize;
-        CpuTemperatureTextBlock.Foreground = ParseBrush(settings.AccentColor, 1);
-        GpuTemperatureTextBlock.Foreground = ParseBrush(settings.SecondaryAccentColor, 1);
+        var textColor = settings.TextReadability == "HighContrast" ? "#FFFFFF" : settings.TextColor;
+        CpuTemperatureTextBlock.Foreground = ParseBrush(textColor, 1);
+        GpuTemperatureTextBlock.Foreground = ParseBrush(textColor, 1);
+        CpuTemperatureTextBlock.Effect = CreateReadabilityEffect(settings.TextReadability);
+        GpuTemperatureTextBlock.Effect = CreateReadabilityEffect(settings.TextReadability);
         CpuChart.StrokeBrush = ParseBrush(settings.AccentColor, 1);
         GpuChart.StrokeBrush = ParseBrush(settings.SecondaryAccentColor, 1);
+        CpuChart.Visibility = settings.ShowCpuGraph ? Visibility.Visible : Visibility.Collapsed;
+        GpuChart.Visibility = settings.ShowGpuGraph ? Visibility.Visible : Visibility.Collapsed;
+        CpuTemperatureTextBlock.Visibility = settings.ShowCpuTemperature ? Visibility.Visible : Visibility.Collapsed;
+        GpuTemperatureTextBlock.Visibility = settings.ShowGpuTemperature ? Visibility.Visible : Visibility.Collapsed;
+        var cpuVisible = settings.ShowCpuTemperature || settings.ShowCpuGraph;
+        var gpuVisible = settings.ShowGpuTemperature || settings.ShowGpuGraph;
+        CpuRow.Visibility = cpuVisible ? Visibility.Visible : Visibility.Collapsed;
+        GpuRow.Visibility = gpuVisible ? Visibility.Visible : Visibility.Collapsed;
+        GpuRow.Margin = cpuVisible && gpuVisible ? new Thickness(0, settings.MetricSpacing, 0, 0) : new Thickness(0);
+        CpuChart.Margin = settings.ShowCpuTemperature
+            ? new Thickness(0, 0, settings.MetricSpacing, 0)
+            : new Thickness(0);
+        GpuChart.Margin = settings.ShowGpuTemperature
+            ? new Thickness(0, 0, settings.MetricSpacing, 0)
+            : new Thickness(0);
+        OverlaySurface.Visibility = cpuVisible || gpuVisible ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private static System.Windows.Media.Brush ParseBrush(string color, double opacity, bool enabled = true)
@@ -208,15 +257,44 @@ public partial class MainWindow : Window
         return brush;
     }
 
+    private static DropShadowEffect? CreateReadabilityEffect(string mode) =>
+        mode switch
+        {
+            "Shadow" => new DropShadowEffect
+            {
+                Color = System.Windows.Media.Colors.Black,
+                BlurRadius = 2,
+                ShadowDepth = 1,
+                Opacity = 0.8
+            },
+            "Outline" => new DropShadowEffect
+            {
+                Color = System.Windows.Media.Colors.Black,
+                BlurRadius = 1,
+                ShadowDepth = 0,
+                Opacity = 1
+            },
+            "HighContrast" => new DropShadowEffect
+            {
+                Color = System.Windows.Media.Colors.Black,
+                BlurRadius = 2,
+                ShadowDepth = 1,
+                Opacity = 1
+            },
+            _ => null
+        };
+
     private Screen GetTargetScreen()
     {
-        var screen = PresentationSource.FromVisual(this) is HwndSource hwndSource
-            ? Screen.FromHandle(hwndSource.Handle)
-            : Screen.PrimaryScreen ?? Screen.AllScreens.FirstOrDefault();
+        var deviceName = DataContext is MainViewModel vm ? vm.Settings.MonitorDeviceName : string.Empty;
+        var screen = Screen.AllScreens.FirstOrDefault(candidate =>
+                candidate.DeviceName.Equals(deviceName, StringComparison.OrdinalIgnoreCase))
+            ?? Screen.PrimaryScreen
+            ?? Screen.AllScreens.FirstOrDefault();
         return screen ?? throw new InvalidOperationException("No monitor detected.");
     }
 
-    private static PixelBounds ToPixelBounds(System.Drawing.Rectangle bounds) =>
+    internal static PixelBounds ToPixelBounds(System.Drawing.Rectangle bounds) =>
         new(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
 
     private void TracePosition(Screen screen, PixelBounds edgeBounds, double dpiScale, double widthDip, double heightDip)
@@ -232,7 +310,7 @@ public partial class MainWindow : Window
             $"windowPx={(rectAvailable ? physicalRect.ToString() : "unavailable")}.");
     }
 
-    private static (double ScaleX, double ScaleY) GetScale(Screen screen)
+    internal static (double ScaleX, double ScaleY) GetScale(Screen screen)
     {
         try
         {

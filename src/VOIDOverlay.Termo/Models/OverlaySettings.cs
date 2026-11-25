@@ -9,7 +9,10 @@ public enum OverlayPosition
     BottomLeft = 2,
     BottomRight = 3,
     TopCenter = 4,
-    BottomCenter = 5
+    BottomCenter = 5,
+    CenterLeft = 6,
+    Center = 7,
+    CenterRight = 8
 }
 
 public enum OverlayEdgeReference
@@ -32,6 +35,14 @@ public sealed class OverlaySettings
     public string TextColor { get; set; } = "#F2F4F7";
     public string AccentColor { get; set; } = "#4DE3D2";
     public string SecondaryAccentColor { get; set; } = "#FFAE5C";
+    public string FontFamily { get; set; } = "Segoe UI";
+    public string TextReadability { get; set; } = "Normal";
+    public double OverlayPadding { get; set; } = 10;
+    public double MetricSpacing { get; set; } = 6;
+    public bool ShowCpuTemperature { get; set; } = true;
+    public bool ShowGpuTemperature { get; set; } = true;
+    public bool ShowCpuGraph { get; set; } = true;
+    public bool ShowGpuGraph { get; set; } = true;
     public bool AlwaysOnTop { get; set; } = true;
     public bool ClickThrough { get; set; } = true;
     public bool IsCompactMode { get; set; } = true;
@@ -44,8 +55,10 @@ public sealed class OverlaySettings
     public double HorizontalOffsetX { get; set; }
     public double VerticalOffsetY { get; set; }
     public OverlayEdgeReference EdgeReference { get; set; } = OverlayEdgeReference.WorkArea;
-    public OverlayPosition Position { get; set; } = OverlayPosition.TopCenter;
-    public string Theme { get; set; } = "Dark";
+    public OverlayPosition Position { get; set; } = OverlayPosition.Center;
+    public string Theme { get; set; } = "System";
+    public string MonitorDeviceName { get; set; } = string.Empty;
+    public int PositionCoordinatesVersion { get; set; } = 1;
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? EdgeMargin { get; set; }
@@ -54,7 +67,7 @@ public sealed class OverlaySettings
     {
         if (!Enum.IsDefined(Position))
         {
-            Position = OverlayPosition.TopCenter;
+            Position = OverlayPosition.Center;
         }
 
         if (!Enum.IsDefined(EdgeReference))
@@ -62,18 +75,26 @@ public sealed class OverlaySettings
             EdgeReference = OverlayEdgeReference.WorkArea;
         }
 
-        HorizontalOffsetX = Math.Clamp(double.IsFinite(HorizontalOffsetX) ? HorizontalOffsetX : 0, -200, 1000);
-        VerticalOffsetY = Math.Clamp(double.IsFinite(VerticalOffsetY) ? VerticalOffsetY : 0, -200, 1000);
+        HorizontalOffsetX = Math.Clamp(double.IsFinite(HorizontalOffsetX) ? HorizontalOffsetX : 0, -10_000, 10_000);
+        VerticalOffsetY = Math.Clamp(double.IsFinite(VerticalOffsetY) ? VerticalOffsetY : 0, -10_000, 10_000);
         RefreshIntervalMs = Math.Clamp(RefreshIntervalMs, 250, 10_000);
-        WindowWidth = double.IsFinite(WindowWidth) ? Math.Clamp(WindowWidth, 180, 1000) : 280;
+        WindowWidth = double.IsFinite(WindowWidth) ? Math.Clamp(WindowWidth, 1, 1000) : 280;
         WindowHeight = double.IsFinite(WindowHeight) ? Math.Clamp(WindowHeight, 42, 500) : 62;
         Opacity = double.IsFinite(Opacity) ? Math.Clamp(Opacity, 0.3, 1) : 1;
         BackgroundOpacity = double.IsFinite(BackgroundOpacity) ? Math.Clamp(BackgroundOpacity, 0, 1) : 0.5;
         FontSize = double.IsFinite(FontSize) ? Math.Clamp(FontSize, 9, 24) : 13;
+        OverlayPadding = double.IsFinite(OverlayPadding) ? Math.Clamp(OverlayPadding, 0, 32) : 10;
+        MetricSpacing = double.IsFinite(MetricSpacing) ? Math.Clamp(MetricSpacing, 0, 24) : 6;
         BackgroundColor = ValidColorOr(BackgroundColor, "#111720");
         TextColor = ValidColorOr(TextColor, "#F2F4F7");
         AccentColor = ValidColorOr(AccentColor, "#4DE3D2");
         SecondaryAccentColor = ValidColorOr(SecondaryAccentColor, "#FFAE5C");
+        FontFamily = FontFamily is "Segoe UI" or "Arial" or "Consolas" ? FontFamily : "Segoe UI";
+        TextReadability = TextReadability is "Normal" or "Shadow" or "Outline" or "HighContrast"
+            ? TextReadability
+            : "Normal";
+        Theme = Theme is "System" or "Light" or "Dark" ? Theme : "System";
+        PositionCoordinatesVersion = Math.Clamp(PositionCoordinatesVersion, 0, 1);
     }
 
     private static string ValidColorOr(string? value, string fallback) =>

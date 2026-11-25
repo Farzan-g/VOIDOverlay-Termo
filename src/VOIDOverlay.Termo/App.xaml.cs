@@ -48,6 +48,8 @@ public partial class App : System.Windows.Application
         }
 
         _settings = _settingsService.Load();
+        SettingsThemeManager.Apply(Resources, _settings.Theme);
+        SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         _overlayWindow = new MainWindow(_settings, diagnosticsEnabled);
 
         if (_settings.IsOverlayVisible)
@@ -65,6 +67,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         _settingsWindow?.CloseForExit();
         _overlayWindow?.Close();
         _notifyIcon?.Dispose();
@@ -104,6 +107,34 @@ public partial class App : System.Windows.Application
     public void SetPosition(OverlayPosition position)
     {
         _settings.Position = position;
+        var screen = Screen.AllScreens.FirstOrDefault(candidate =>
+                         candidate.DeviceName.Equals(
+                             _settings.MonitorDeviceName,
+                             StringComparison.OrdinalIgnoreCase))
+                     ?? Screen.PrimaryScreen
+                     ?? Screen.AllScreens.FirstOrDefault();
+        if (screen is not null)
+        {
+            var monitorBounds = VOIDOverlay.MainWindow.ToPixelBounds(screen.Bounds);
+            var usableBounds = OverlayPositionCalculator.SelectEdgeBounds(
+                monitorBounds,
+                VOIDOverlay.MainWindow.ToPixelBounds(screen.WorkingArea),
+                _settings.EdgeReference);
+            var (scaleX, scaleY) = VOIDOverlay.MainWindow.GetScale(screen);
+            var (width, height) = GetOverlaySize();
+            var offsets = OverlayPositionCalculator.GetPresetOffsets(
+                monitorBounds,
+                usableBounds,
+                scaleX,
+                scaleY,
+                width,
+                height,
+                position);
+            _settings.HorizontalOffsetX = offsets.X;
+            _settings.VerticalOffsetY = offsets.Y;
+        }
+
+        _settings.PositionCoordinatesVersion = 1;
         _overlayWindow?.ApplySettings(_settings);
         _overlayWindow?.ApplyWindowPosition();
         _settingsService.Save(_settings);
@@ -118,6 +149,7 @@ public partial class App : System.Windows.Application
         _settings.HorizontalOffsetX = horizontalOffsetX;
         _settings.VerticalOffsetY = verticalOffsetY;
         _settings.EdgeReference = edgeReference;
+        _settings.PositionCoordinatesVersion = 1;
         _overlayWindow?.ApplyWindowPosition();
         if (persist)
         {
@@ -148,6 +180,7 @@ public partial class App : System.Windows.Application
     public void ApplySettings(OverlaySettings settings)
     {
         _settings = settings;
+        SettingsThemeManager.Apply(Resources, settings.Theme);
         _overlayWindow?.ApplySettings(settings);
         UpdateTrayMenu();
     }
@@ -163,6 +196,18 @@ public partial class App : System.Windows.Application
 
         _settingsWindow = new OverlaySettingsWindow(_settings, this);
         _settingsWindow.Show();
+    }
+
+    public (double Width, double Height) GetOverlaySize()
+    {
+        if (_overlayWindow is null)
+        {
+            return (280, 44);
+        }
+
+        return (
+            _overlayWindow.ActualWidth > 0 ? _overlayWindow.ActualWidth : 280,
+            _overlayWindow.ActualHeight > 0 ? _overlayWindow.ActualHeight : 44);
     }
 
     public void SaveSettings()
@@ -248,6 +293,16 @@ public partial class App : System.Windows.Application
         {
             _startupMenuItem.Checked = _settings.StartWithWindows;
         }
+    }
+
+    private void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e)
+    {
+        if (!string.Equals(_settings.Theme, "System", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(new Action(() => SettingsThemeManager.Apply(Resources, _settings.Theme)));
     }
 
     private static void UpdateStartupRegistry(bool enabled)

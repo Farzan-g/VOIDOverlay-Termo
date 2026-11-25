@@ -10,6 +10,7 @@ public interface IHardwareMonitorService : IDisposable
 {
     event EventHandler<HardwareReading>? ReadingUpdated;
     HardwareReading GetLatestReading();
+    void SetMetricVisibility(bool showCpu, bool showGpu);
     void Start(int intervalMs = 1000);
     void Stop();
     IReadOnlyList<SensorStatus> GetAvailableSensors();
@@ -27,6 +28,8 @@ public sealed class HardwareMonitorService : IHardwareMonitorService
     private bool _isRunning;
     private bool _isInitializing;
     private bool _startRequested;
+    private bool _sampleCpu = true;
+    private bool _sampleGpu = true;
     private int _pollInProgress;
 
     public HardwareMonitorService(bool diagnosticsEnabled = false)
@@ -52,6 +55,15 @@ public sealed class HardwareMonitorService : IHardwareMonitorService
         lock (_pollLock)
         {
             return _latest;
+        }
+    }
+
+    public void SetMetricVisibility(bool showCpu, bool showGpu)
+    {
+        lock (_pollLock)
+        {
+            _sampleCpu = showCpu;
+            _sampleGpu = showGpu;
         }
     }
 
@@ -134,9 +146,9 @@ public sealed class HardwareMonitorService : IHardwareMonitorService
                         return;
                     }
 
-                    var updateVisitor = new UpdateVisitor();
+                    var updateVisitor = new UpdateVisitor(_sampleCpu, _sampleGpu);
                     _computer.Accept(updateVisitor);
-                    reading = BuildReading(updateVisitor.FailedHardwareIds);
+                    reading = BuildReading(updateVisitor.FailedHardwareIds, _sampleCpu, _sampleGpu);
                     _latest = reading;
                 }
 
@@ -239,45 +251,56 @@ public sealed class HardwareMonitorService : IHardwareMonitorService
         }
     }
 
-    private HardwareReading BuildReading(IReadOnlySet<string> failedHardwareIds)
+    private HardwareReading BuildReading(
+        IReadOnlySet<string> failedHardwareIds,
+        bool sampleCpu,
+        bool sampleGpu)
     {
         var reading = new HardwareReading { TimestampUtc = DateTime.UtcNow };
         var allHardware = GetHardwareTree().ToArray();
-        var cpuHardware = allHardware.Where(IsCpuDevice).ToArray();
+        var cpuHardware = sampleCpu ? allHardware.Where(IsCpuDevice).ToArray() : [];
         var updatedCpuHardware = cpuHardware
             .Where(hardware => !failedHardwareIds.Contains(hardware.Identifier.ToString()))
             .ToArray();
-        var gpuHardware = allHardware
+        var gpuHardware = sampleGpu ? allHardware
             .Where(hardware => IsGpu(hardware.HardwareType) && !failedHardwareIds.Contains(hardware.Identifier.ToString()))
             .OrderBy(hardware => hardware.HardwareType == HardwareType.GpuNvidia ? 0 : 1)
-            .ToArray();
+            .ToArray() : [];
 
-        var cpuCandidates = CreateCpuCandidates(allHardware, failedHardwareIds);
-        var cpuTemperature = CpuTemperatureSelector.Select(cpuCandidates);
-        var gpuTemperature = SelectGpuTemperature(gpuHardware);
-        LogCpuSelection(cpuTemperature, cpuCandidates, failedHardwareIds);
-        LogSelection(ref _selectedGpuSensor, "GPU", gpuTemperature);
+        var cpuCandidates = sampleCpu ? CreateCpuCandidates(allHardware, failedHardwareIds) : [];
+        var cpuTemperature = sampleCpu ? CpuTemperatureSelector.Select(cpuCandidates) : null;
+        var gpuTemperature = sampleGpu ? SelectGpuTemperature(gpuHardware) : null;
+        if (sampleCpu)
+        {
+            LogCpuSelection(cpuTemperature, cpuCandidates, failedHardwareIds);
+        }
+
+        if (sampleGpu)
+        {
+            LogSelection(ref _selectedGpuSensor, "GPU", gpuTemperature);
+        }
+
         reading.CpuTemperatureC = cpuTemperature?.Value;
         reading.GpuTemperatureC = ValidValue(gpuTemperature?.Sensor.Value);
 
-        var cpuLoad = updatedCpuHardware.SelectMany(GetSensors)
+        var cpuLoad = sampleCpu ? updatedCpuHardware.SelectMany(GetSensors)
             .Where(sensor => sensor.SensorType == SensorType.Load)
             .Select(sensor => ValidValue(sensor.Value))
             .Where(value => value.HasValue)
             .Select(value => value!.Value)
-            .ToArray();
+            .ToArray() : [];
         var gpuSensors = gpuHardware.SelectMany(GetSensors).ToArray();
         var gpuLoad = gpuSensors.Where(sensor => sensor.SensorType == SensorType.Load)
             .Select(sensor => ValidValue(sensor.Value))
             .Where(value => value.HasValue)
             .Select(value => value!.Value)
             .ToArray();
-        var cpuClocks = updatedCpuHardware.SelectMany(GetSensors)
+        var cpuClocks = sampleCpu ? updatedCpuHardware.SelectMany(GetSensors)
             .Where(sensor => sensor.SensorType == SensorType.Clock)
             .Select(sensor => ValidValue(sensor.Value))
             .Where(value => value.HasValue)
             .Select(value => value!.Value)
-            .ToArray();
+            .ToArray() : [];
         var gpuClocks = gpuSensors.Where(sensor => sensor.SensorType == SensorType.Clock)
             .Select(sensor => ValidValue(sensor.Value))
             .Where(value => value.HasValue)
@@ -537,7 +560,7 @@ public sealed class HardwareMonitorService : IHardwareMonitorService
         }
     }
 
-    private sealed class UpdateVisitor : IVisitor
+    private sealed class UpdateVisitor(bool sampleCpu, bool sampleGpu) : IVisitor
     {
         public HashSet<string> FailedHardwareIds { get; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -551,21 +574,31 @@ public sealed class HardwareMonitorService : IHardwareMonitorService
 
         public void VisitHardware(IHardware hardware)
         {
-            try
+            var skipGpuTree = !sampleGpu && IsGpu(hardware.HardwareType);
+            var updateHardware =
+                !skipGpuTree &&
+                (sampleCpu || !IsCpuDevice(hardware) && hardware.HardwareType != HardwareType.Motherboard);
+            if (updateHardware)
             {
-                hardware.Update();
-            }
-            catch (Exception exception)
-            {
-                FailedHardwareIds.Add(hardware.Identifier.ToString());
-                Trace.WriteLine(
-                    $"Hardware update failed for '{hardware.Name}' (type={hardware.HardwareType}, " +
-                    $"id={hardware.Identifier}): {exception}");
+                try
+                {
+                    hardware.Update();
+                }
+                catch (Exception exception)
+                {
+                    FailedHardwareIds.Add(hardware.Identifier.ToString());
+                    Trace.WriteLine(
+                        $"Hardware update failed for '{hardware.Name}' (type={hardware.HardwareType}, " +
+                        $"id={hardware.Identifier}): {exception}");
+                }
             }
 
-            foreach (var subHardware in hardware.SubHardware)
+            if (!skipGpuTree)
             {
-                VisitHardware(subHardware);
+                foreach (var subHardware in hardware.SubHardware)
+                {
+                    VisitHardware(subHardware);
+                }
             }
         }
 

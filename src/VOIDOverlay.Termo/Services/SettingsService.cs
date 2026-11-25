@@ -57,6 +57,16 @@ public sealed class SettingsService
 
             var hasHorizontalOffset = root.TryGetProperty(nameof(OverlaySettings.HorizontalOffsetX), out _);
             var hasVerticalOffset = root.TryGetProperty(nameof(OverlaySettings.VerticalOffsetY), out _);
+            if (!root.TryGetProperty(nameof(OverlaySettings.PositionCoordinatesVersion), out _))
+            {
+                settings.PositionCoordinatesVersion = 0;
+            }
+
+            if (!root.TryGetProperty(nameof(OverlaySettings.Position), out _))
+            {
+                settings.Position = OverlayPosition.TopCenter;
+            }
+
             if (settings.EdgeMargin.HasValue)
             {
                 if (!hasHorizontalOffset)

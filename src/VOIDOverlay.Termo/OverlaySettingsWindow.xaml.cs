@@ -1,8 +1,14 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using VOIDOverlay.Models;
+using VOIDOverlay.Services;
+using Forms = System.Windows.Forms;
+using KeyEventArgs = System.Windows.Input.KeyEventArgs;
+using TextBox = System.Windows.Controls.TextBox;
 
 namespace VOIDOverlay;
 
@@ -13,6 +19,7 @@ public partial class OverlaySettingsWindow : Window
     private readonly DispatcherTimer _saveTimer;
     private bool _initialized;
     private bool _synchronizingOffsets;
+    private bool _updatingPresetSelection;
     private bool _allowClose;
 
     public OverlaySettingsWindow(OverlaySettings settings, App app)
@@ -27,9 +34,11 @@ public partial class OverlaySettingsWindow : Window
             _saveTimer.Stop();
             _app.SaveSettings();
         };
-        PositionComboBox.ItemsSource = Enum.GetValues<OverlayPosition>();
+        MonitorCombo.ItemsSource = GetMonitorOptions();
         LoadSettings();
         WireChanges();
+        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+        Closed += (_, _) => SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         Closing += OnClosing;
     }
 
@@ -38,6 +47,20 @@ public partial class OverlaySettingsWindow : Window
         _allowClose = true;
         _saveTimer.Stop();
         Close();
+    }
+
+    private bool PositionControlsEnabled
+    {
+        set
+        {
+            PositionCombo.IsEnabled = value;
+            MonitorCombo.IsEnabled = value;
+            EdgeReferenceCombo.IsEnabled = value;
+            OffsetXSlider.IsEnabled = value;
+            OffsetYSlider.IsEnabled = value;
+            OffsetXBox.IsEnabled = value;
+            OffsetYBox.IsEnabled = value;
+        }
     }
 
     private void LoadSettings()
@@ -55,23 +78,42 @@ public partial class OverlaySettingsWindow : Window
         TextColorBox.Text = _settings.TextColor;
         AccentColorBox.Text = _settings.AccentColor;
         SecondaryAccentColorBox.Text = _settings.SecondaryAccentColor;
+        FontFamilyCombo.SelectedValue = _settings.FontFamily;
         FontSizeSlider.Value = _settings.FontSize;
-        PositionComboBox.SelectedItem = _settings.Position;
-        EdgeReferenceComboBox.SelectedIndex =
+        ReadabilityCombo.SelectedValue = _settings.TextReadability;
+        ThemeCombo.SelectedValue = _settings.Theme;
+        IntervalCombo.SelectedValue = _settings.RefreshIntervalMs.ToString(CultureInfo.InvariantCulture);
+        CpuTemperatureCheck.IsChecked = _settings.ShowCpuTemperature;
+        GpuTemperatureCheck.IsChecked = _settings.ShowGpuTemperature;
+        CpuGraphCheck.IsChecked = _settings.ShowCpuGraph;
+        GpuGraphCheck.IsChecked = _settings.ShowGpuGraph;
+        MetricSpacingSlider.Value = _settings.MetricSpacing;
+        OverlayPaddingSlider.Value = _settings.OverlayPadding;
+        PositionCombo.SelectedValue = _settings.Position.ToString();
+        MonitorCombo.SelectedItem = MonitorCombo.Items
+            .Cast<MonitorOption>()
+            .FirstOrDefault(item => item.DeviceName.Equals(
+                _settings.MonitorDeviceName,
+                StringComparison.OrdinalIgnoreCase))
+            ?? MonitorCombo.Items.Cast<MonitorOption>().FirstOrDefault(item =>
+                item.DeviceName.Equals(
+                    (Forms.Screen.PrimaryScreen?.DeviceName ?? string.Empty),
+                    StringComparison.OrdinalIgnoreCase));
+        EdgeReferenceCombo.SelectedIndex =
             _settings.EdgeReference == OverlayEdgeReference.WorkArea ? 0 : 1;
         OffsetXSlider.Value = _settings.HorizontalOffsetX;
         OffsetYSlider.Value = _settings.VerticalOffsetY;
-        OffsetXBox.Text = FormatOffset(_settings.HorizontalOffsetX);
-        OffsetYBox.Text = FormatOffset(_settings.VerticalOffsetY);
-        IntervalComboBox.SelectedValue = _settings.RefreshIntervalMs.ToString(CultureInfo.InvariantCulture);
-        PositionControls.IsEnabled = !_settings.IsLocked;
+        OffsetXBox.Text = FormatCoordinate(_settings.HorizontalOffsetX);
+        OffsetYBox.Text = FormatCoordinate(_settings.VerticalOffsetY);
+        UpdateOffsetRange();
+        PositionControlsEnabled = !_settings.IsLocked;
         _initialized = true;
     }
 
     private void WireChanges()
     {
-        StartupCheck.Checked += SettingsChanged;
-        StartupCheck.Unchecked += SettingsChanged;
+        StartupCheck.Checked += StartupChanged;
+        StartupCheck.Unchecked += StartupChanged;
         TopmostCheck.Checked += SettingsChanged;
         TopmostCheck.Unchecked += SettingsChanged;
         LockedCheck.Checked += SettingsChanged;
@@ -88,17 +130,95 @@ public partial class OverlaySettingsWindow : Window
         TextColorBox.LostFocus += SettingsChanged;
         AccentColorBox.LostFocus += SettingsChanged;
         SecondaryAccentColorBox.LostFocus += SettingsChanged;
+        FontFamilyCombo.SelectionChanged += SettingsChanged;
         FontSizeSlider.ValueChanged += SettingsChanged;
-        PositionComboBox.SelectionChanged += SettingsChanged;
-        EdgeReferenceComboBox.SelectionChanged += SettingsChanged;
-        IntervalComboBox.SelectionChanged += SettingsChanged;
+        ReadabilityCombo.SelectionChanged += SettingsChanged;
+        ThemeCombo.SelectionChanged += SettingsChanged;
+        IntervalCombo.SelectionChanged += SettingsChanged;
+        CpuTemperatureCheck.Checked += SettingsChanged;
+        CpuTemperatureCheck.Unchecked += SettingsChanged;
+        GpuTemperatureCheck.Checked += SettingsChanged;
+        GpuTemperatureCheck.Unchecked += SettingsChanged;
+        CpuGraphCheck.Checked += SettingsChanged;
+        CpuGraphCheck.Unchecked += SettingsChanged;
+        GpuGraphCheck.Checked += SettingsChanged;
+        GpuGraphCheck.Unchecked += SettingsChanged;
+        MetricSpacingSlider.ValueChanged += SettingsChanged;
+        OverlayPaddingSlider.ValueChanged += SettingsChanged;
         OffsetXSlider.ValueChanged += OffsetSliderChanged;
         OffsetYSlider.ValueChanged += OffsetSliderChanged;
-        OffsetXBox.LostFocus += OffsetTextChanged;
-        OffsetYBox.LostFocus += OffsetTextChanged;
+    }
+
+    private void StartupChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_initialized)
+        {
+            return;
+        }
+
+        try
+        {
+            var enabled = StartupCheck.IsChecked == true;
+            if (enabled != _settings.StartWithWindows)
+            {
+                _app.SetStartWithWindows(enabled);
+            }
+
+            ApplySettings();
+        }
+        catch (Exception exception) when (
+            exception is UnauthorizedAccessException or InvalidOperationException or System.Security.SecurityException)
+        {
+            System.Diagnostics.Trace.WriteLine($"Unable to update Termo startup registration: {exception}");
+            StartupCheck.IsChecked = _settings.StartWithWindows;
+        }
     }
 
     private void SettingsChanged(object sender, RoutedEventArgs e) => ApplySettings();
+
+    private void PositionPresetChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_initialized || _updatingPresetSelection ||
+            !Enum.TryParse<OverlayPosition>(PositionCombo.SelectedValue?.ToString(), out var preset) ||
+            !TryGetSelectedDisplay(out var screen))
+        {
+            return;
+        }
+
+        var (monitorBounds, usableBounds, dpiScaleX, dpiScaleY) = GetSelectedDisplayBounds(screen);
+        var (width, height) = _app.GetOverlaySize();
+        var offsets = OverlayPositionCalculator.GetPresetOffsets(
+            monitorBounds,
+            usableBounds,
+            dpiScaleX,
+            dpiScaleY,
+            width,
+            height,
+            preset);
+        _settings.Position = preset;
+        SetOffsetValues(offsets.X, offsets.Y);
+        ApplySettings();
+    }
+
+    private void MonitorChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_initialized)
+        {
+            return;
+        }
+
+        UpdateOffsetRange();
+        ApplySettings();
+    }
+
+    private void BoundsChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_initialized)
+        {
+            UpdateOffsetRange();
+            ApplySettings();
+        }
+    }
 
     private void OffsetSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
@@ -107,23 +227,9 @@ public partial class OverlaySettingsWindow : Window
             return;
         }
 
-        _synchronizingOffsets = true;
-        try
-        {
-            if (ReferenceEquals(sender, OffsetXSlider))
-            {
-                OffsetXBox.Text = FormatOffset(OffsetXSlider.Value);
-            }
-            else
-            {
-                OffsetYBox.Text = FormatOffset(OffsetYSlider.Value);
-            }
-        }
-        finally
-        {
-            _synchronizingOffsets = false;
-        }
-
+        var x = ReferenceEquals(sender, OffsetXSlider) ? OffsetXSlider.Value : _settings.HorizontalOffsetX;
+        var y = ReferenceEquals(sender, OffsetYSlider) ? OffsetYSlider.Value : _settings.VerticalOffsetY;
+        SetOffsetValues(x, y);
         ApplySettings();
     }
 
@@ -134,51 +240,146 @@ public partial class OverlaySettingsWindow : Window
             return;
         }
 
-        var textBox = (System.Windows.Controls.TextBox)sender;
-        if (!TryParseOffset(textBox.Text, out var offset))
+        var box = (TextBox)sender;
+        var isX = ReferenceEquals(box, OffsetXBox);
+        if (!TryParseCoordinate(
+                box.Text,
+                isX ? OffsetXSlider.Minimum : OffsetYSlider.Minimum,
+                isX ? OffsetXSlider.Maximum : OffsetYSlider.Maximum,
+                out var offset))
         {
-            textBox.ToolTip = "Enter a finite value from -200 to 1000 DIPs.";
+            box.ToolTip = "Enter a number within the current display range (up to two decimal places).";
             return;
         }
 
-        textBox.ToolTip = null;
+        box.ToolTip = null;
+        SetOffsetValues(
+            isX ? offset : _settings.HorizontalOffsetX,
+            isX ? _settings.VerticalOffsetY : offset);
+        ApplySettings();
+    }
+
+    private void OffsetKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            OffsetTextChanged(sender, new RoutedEventArgs());
+            e.Handled = true;
+        }
+    }
+
+    private void SetOffsetValues(double x, double y)
+    {
         _synchronizingOffsets = true;
         try
         {
-            if (ReferenceEquals(textBox, OffsetXBox))
-            {
-                OffsetXSlider.Value = offset;
-            }
-            else
-            {
-                OffsetYSlider.Value = offset;
-            }
+            x = Math.Round(x, 2, MidpointRounding.AwayFromZero);
+            y = Math.Round(y, 2, MidpointRounding.AwayFromZero);
+            OffsetXSlider.Value = Math.Clamp(x, OffsetXSlider.Minimum, OffsetXSlider.Maximum);
+            OffsetYSlider.Value = Math.Clamp(y, OffsetYSlider.Minimum, OffsetYSlider.Maximum);
+            OffsetXBox.Text = FormatCoordinate(OffsetXSlider.Value);
+            OffsetYBox.Text = FormatCoordinate(OffsetYSlider.Value);
+        }
+        finally
+        {
+            _synchronizingOffsets = false;
+        }
+    }
+
+    private void UpdateOffsetRange()
+    {
+        if (!TryGetSelectedDisplay(out var screen))
+        {
+            return;
+        }
+
+        var (monitorBounds, usableBounds, dpiScaleX, dpiScaleY) = GetSelectedDisplayBounds(screen);
+        var (width, height) = _app.GetOverlaySize();
+        var range = OverlayPositionCalculator.GetOffsetRange(
+            monitorBounds,
+            usableBounds,
+            dpiScaleX,
+            dpiScaleY,
+            width,
+            height);
+        _synchronizingOffsets = true;
+        try
+        {
+            OffsetXSlider.Minimum = range.MinimumX;
+            OffsetXSlider.Maximum = range.MaximumX;
+            OffsetYSlider.Minimum = range.MinimumY;
+            OffsetYSlider.Maximum = range.MaximumY;
+            OffsetXSlider.Value = Math.Clamp(_settings.HorizontalOffsetX, range.MinimumX, range.MaximumX);
+            OffsetYSlider.Value = Math.Clamp(_settings.VerticalOffsetY, range.MinimumY, range.MaximumY);
+            _settings.HorizontalOffsetX = Math.Round(OffsetXSlider.Value, 2, MidpointRounding.AwayFromZero);
+            _settings.VerticalOffsetY = Math.Round(OffsetYSlider.Value, 2, MidpointRounding.AwayFromZero);
+            OffsetXBox.Text = FormatCoordinate(_settings.HorizontalOffsetX);
+            OffsetYBox.Text = FormatCoordinate(_settings.VerticalOffsetY);
         }
         finally
         {
             _synchronizingOffsets = false;
         }
 
-        ApplySettings();
+        UpdatePresetSelection();
+    }
+
+    private void UpdatePresetSelection()
+    {
+        if (!TryGetSelectedDisplay(out var screen))
+        {
+            return;
+        }
+
+        var (monitorBounds, usableBounds, dpiScaleX, dpiScaleY) = GetSelectedDisplayBounds(screen);
+        var (width, height) = _app.GetOverlaySize();
+        var matchingPreset = Enum.GetValues<OverlayPosition>().FirstOrDefault(preset =>
+        {
+            var offsets = OverlayPositionCalculator.GetPresetOffsets(
+                monitorBounds,
+                usableBounds,
+                dpiScaleX,
+                dpiScaleY,
+                width,
+                height,
+                preset);
+            return Math.Abs(offsets.X - _settings.HorizontalOffsetX) < 0.5 &&
+                   Math.Abs(offsets.Y - _settings.VerticalOffsetY) < 0.5;
+        });
+        var hasMatch = Enum.GetValues<OverlayPosition>().Any(preset =>
+        {
+            var offsets = OverlayPositionCalculator.GetPresetOffsets(
+                monitorBounds,
+                usableBounds,
+                dpiScaleX,
+                dpiScaleY,
+                width,
+                height,
+                preset);
+            return Math.Abs(offsets.X - _settings.HorizontalOffsetX) < 0.5 &&
+                   Math.Abs(offsets.Y - _settings.VerticalOffsetY) < 0.5;
+        });
+
+        _updatingPresetSelection = true;
+        try
+        {
+            PositionCombo.SelectedValue = hasMatch ? matchingPreset.ToString() : null;
+        }
+        finally
+        {
+            _updatingPresetSelection = false;
+        }
     }
 
     private void ApplySettings()
     {
-        if (!_initialized)
-        {
-            return;
-        }
-
-        if (!TryReadAppearanceColor(BackgroundColorBox, out var backgroundColor) ||
-            !TryReadAppearanceColor(TextColorBox, out var textColor) ||
-            !TryReadAppearanceColor(AccentColorBox, out var accentColor) ||
-            !TryReadAppearanceColor(SecondaryAccentColorBox, out var secondaryColor))
-        {
-            return;
-        }
-
-        if (!TryParseOffset(OffsetXBox.Text, out var offsetX) ||
-            !TryParseOffset(OffsetYBox.Text, out var offsetY))
+        if (!_initialized ||
+            !TryReadColor(BackgroundColorBox, out var backgroundColor) ||
+            !TryReadColor(TextColorBox, out var textColor) ||
+            !TryReadColor(AccentColorBox, out var accentColor) ||
+            !TryReadColor(SecondaryAccentColorBox, out var secondaryColor) ||
+            !TryParseCoordinate(OffsetXBox.Text, OffsetXSlider.Minimum, OffsetXSlider.Maximum, out var offsetX) ||
+            !TryParseCoordinate(OffsetYBox.Text, OffsetYSlider.Minimum, OffsetYSlider.Maximum, out var offsetY))
         {
             return;
         }
@@ -209,36 +410,48 @@ public partial class OverlaySettingsWindow : Window
         _settings.TextColor = textColor;
         _settings.AccentColor = accentColor;
         _settings.SecondaryAccentColor = secondaryColor;
+        _settings.FontFamily = FontFamilyCombo.SelectedValue?.ToString() ?? "Segoe UI";
         _settings.FontSize = FontSizeSlider.Value;
-        if (PositionComboBox.SelectedItem is OverlayPosition position)
-        {
-            _settings.Position = position;
-        }
-
-        _settings.EdgeReference = EdgeReferenceComboBox.SelectedIndex == 0
-            ? OverlayEdgeReference.WorkArea
-            : OverlayEdgeReference.FullScreen;
+        _settings.TextReadability = ReadabilityCombo.SelectedValue?.ToString() ?? "Normal";
+        _settings.Theme = ThemeCombo.SelectedValue?.ToString() ?? "System";
+        _settings.ShowCpuTemperature = CpuTemperatureCheck.IsChecked == true;
+        _settings.ShowGpuTemperature = GpuTemperatureCheck.IsChecked == true;
+        _settings.ShowCpuGraph = CpuGraphCheck.IsChecked == true;
+        _settings.ShowGpuGraph = GpuGraphCheck.IsChecked == true;
+        _settings.MetricSpacing = MetricSpacingSlider.Value;
+        _settings.OverlayPadding = OverlayPaddingSlider.Value;
         _settings.HorizontalOffsetX = offsetX;
         _settings.VerticalOffsetY = offsetY;
-        if (IntervalComboBox.SelectedItem is ComboBoxItem interval &&
-            int.TryParse(interval.Tag?.ToString(), out var milliseconds))
+        _settings.MonitorDeviceName = (MonitorCombo.SelectedItem as MonitorOption)?.DeviceName ?? string.Empty;
+        _settings.EdgeReference = EdgeReferenceCombo.SelectedIndex == 0
+            ? OverlayEdgeReference.WorkArea
+            : OverlayEdgeReference.FullScreen;
+        _settings.PositionCoordinatesVersion = 1;
+
+        if (IntervalCombo.SelectedItem is ComboBoxItem interval &&
+            int.TryParse(interval.Tag?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var milliseconds))
         {
             _settings.RefreshIntervalMs = milliseconds;
         }
 
-        PositionControls.IsEnabled = !_settings.IsLocked;
+        if (PositionCombo.SelectedValue is string positionName &&
+            Enum.TryParse<OverlayPosition>(positionName, out var positionPreset))
+        {
+            _settings.Position = positionPreset;
+        }
+
         _settings.Validate();
+        PositionControlsEnabled = !_settings.IsLocked;
         _app.ApplySettings(_settings);
+        UpdateOffsetRange();
         _saveTimer.Stop();
         _saveTimer.Start();
     }
 
-    private static bool TryReadAppearanceColor(System.Windows.Controls.TextBox textBox, out string value)
+    private static bool TryReadColor(TextBox textBox, out string value)
     {
         value = textBox.Text.Trim();
-        if (value.Length == 7 &&
-            value[0] == '#' &&
-            value.Skip(1).All(Uri.IsHexDigit))
+        if (value.Length == 7 && value[0] == '#' && value.Skip(1).All(Uri.IsHexDigit))
         {
             value = value.ToUpperInvariant();
             textBox.ToolTip = null;
@@ -250,12 +463,72 @@ public partial class OverlaySettingsWindow : Window
         return false;
     }
 
-    private static bool TryParseOffset(string text, out double value) =>
-        double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value) &&
-        double.IsFinite(value) &&
-        value is >= -200 and <= 1000;
+    private static bool TryParseCoordinate(string text, double minimum, double maximum, out double value)
+    {
+        var valid = double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value) &&
+                    double.IsFinite(value) &&
+                    value >= minimum &&
+                    value <= maximum;
+        if (valid)
+        {
+            value = Math.Round(value, 2, MidpointRounding.AwayFromZero);
+        }
 
-    private static string FormatOffset(double value) => value.ToString("G", CultureInfo.CurrentCulture);
+        return valid;
+    }
+
+    private static string FormatCoordinate(double value) =>
+        Math.Round(value, 2, MidpointRounding.AwayFromZero).ToString("0.##", CultureInfo.InvariantCulture);
+
+    private bool TryGetSelectedDisplay(out Forms.Screen screen)
+    {
+        var deviceName = (MonitorCombo.SelectedItem as MonitorOption)?.DeviceName;
+        screen = Forms.Screen.AllScreens.FirstOrDefault(candidate =>
+                     candidate.DeviceName.Equals(deviceName, StringComparison.OrdinalIgnoreCase))
+                 ?? Forms.Screen.PrimaryScreen
+                 ?? Forms.Screen.AllScreens.FirstOrDefault()!;
+        return screen is not null;
+    }
+
+    private (PixelBounds Monitor, PixelBounds Usable, double ScaleX, double ScaleY) GetSelectedDisplayBounds(
+        Forms.Screen screen)
+    {
+        var fullBounds = MainWindow.ToPixelBounds(screen.Bounds);
+        var workBounds = MainWindow.ToPixelBounds(screen.WorkingArea);
+        var usableBounds = OverlayPositionCalculator.SelectEdgeBounds(
+            fullBounds,
+            workBounds,
+            EdgeReferenceCombo.SelectedIndex == 1
+                ? OverlayEdgeReference.FullScreen
+                : OverlayEdgeReference.WorkArea);
+        var (scaleX, scaleY) = MainWindow.GetScale(screen);
+        return (fullBounds, usableBounds, scaleX, scaleY);
+    }
+
+    private static List<MonitorOption> GetMonitorOptions() =>
+        Forms.Screen.AllScreens
+            .Select(screen => new MonitorOption(
+                screen.DeviceName,
+                $"{screen.DeviceName} {(screen.Primary ? "(Primary)" : string.Empty)}"))
+            .ToList();
+
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e)
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            var selectedDevice = (MonitorCombo.SelectedItem as MonitorOption)?.DeviceName;
+            MonitorCombo.ItemsSource = GetMonitorOptions();
+            MonitorCombo.SelectedItem = MonitorCombo.Items
+                .Cast<MonitorOption>()
+                .FirstOrDefault(item => item.DeviceName.Equals(selectedDevice, StringComparison.OrdinalIgnoreCase))
+                ?? MonitorCombo.Items.Cast<MonitorOption>().FirstOrDefault(item => item.Name.Contains("(Primary)"));
+            if (_initialized)
+            {
+                UpdateOffsetRange();
+                ApplySettings();
+            }
+        }));
+    }
 
     private void Reset_Click(object sender, RoutedEventArgs e)
     {
@@ -297,6 +570,14 @@ public partial class OverlaySettingsWindow : Window
         destination.TextColor = source.TextColor;
         destination.AccentColor = source.AccentColor;
         destination.SecondaryAccentColor = source.SecondaryAccentColor;
+        destination.FontFamily = source.FontFamily;
+        destination.TextReadability = source.TextReadability;
+        destination.OverlayPadding = source.OverlayPadding;
+        destination.MetricSpacing = source.MetricSpacing;
+        destination.ShowCpuTemperature = source.ShowCpuTemperature;
+        destination.ShowGpuTemperature = source.ShowGpuTemperature;
+        destination.ShowCpuGraph = source.ShowCpuGraph;
+        destination.ShowGpuGraph = source.ShowGpuGraph;
         destination.FontSize = source.FontSize;
         destination.AlwaysOnTop = source.AlwaysOnTop;
         destination.ClickThrough = source.ClickThrough;
@@ -312,6 +593,10 @@ public partial class OverlaySettingsWindow : Window
         destination.EdgeReference = source.EdgeReference;
         destination.Position = source.Position;
         destination.Theme = source.Theme;
+        destination.MonitorDeviceName = source.MonitorDeviceName;
+        destination.PositionCoordinatesVersion = source.PositionCoordinatesVersion;
         destination.EdgeMargin = source.EdgeMargin;
     }
+
+    private sealed record MonitorOption(string DeviceName, string Name);
 }

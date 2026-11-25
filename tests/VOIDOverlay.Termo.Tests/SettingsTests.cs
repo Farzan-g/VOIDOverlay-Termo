@@ -9,7 +9,7 @@ public class SettingsTests
     {
         var settings = new OverlaySettings();
 
-        Assert.Equal(OverlayPosition.TopCenter, settings.Position);
+        Assert.Equal(OverlayPosition.Center, settings.Position);
         Assert.Equal(280, settings.WindowWidth);
         Assert.Equal(62, settings.WindowHeight);
         Assert.Equal(1000, settings.RefreshIntervalMs);
@@ -20,6 +20,13 @@ public class SettingsTests
         Assert.Equal("#F2F4F7", settings.TextColor);
         Assert.Equal("#4DE3D2", settings.AccentColor);
         Assert.Equal("#FFAE5C", settings.SecondaryAccentColor);
+        Assert.Equal("Segoe UI", settings.FontFamily);
+        Assert.Equal("Normal", settings.TextReadability);
+        Assert.Equal("System", settings.Theme);
+        Assert.True(settings.ShowCpuTemperature);
+        Assert.True(settings.ShowGpuTemperature);
+        Assert.True(settings.ShowCpuGraph);
+        Assert.True(settings.ShowGpuGraph);
         Assert.Equal(1, settings.Opacity);
         Assert.Equal(0, settings.HorizontalOffsetX);
         Assert.Equal(0, settings.VerticalOffsetY);
@@ -54,6 +61,7 @@ public class SettingsTests
                 Assert.Equal(123.25, reloaded.VerticalOffsetY);
                 Assert.Equal(OverlayEdgeReference.FullScreen, reloaded.EdgeReference);
                 Assert.True(reloaded.BackgroundEnabled);
+                Assert.Equal(1, reloaded.PositionCoordinatesVersion);
             }
 
             Assert.DoesNotContain("EdgeMargin", File.ReadAllText(path));
@@ -81,6 +89,31 @@ public class SettingsTests
 
             Assert.False(loaded.BackgroundEnabled);
             Assert.Equal(OverlayPosition.TopCenter, loaded.Position);
+            Assert.Equal(0, loaded.PositionCoordinatesVersion);
+        }
+        finally
+        {
+            if (Directory.Exists(folder))
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void SettingsService_AssumesLegacyTopCenterWhenPositionIsMissing()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), $"void-overlay-settings-{Guid.NewGuid():N}");
+        var path = Path.Combine(folder, "settings.json");
+        try
+        {
+            Directory.CreateDirectory(folder);
+            File.WriteAllText(path, """{"HorizontalOffsetX":15,"VerticalOffsetY":20}""");
+
+            var loaded = new VOIDOverlay.Services.SettingsService(path).Load();
+
+            Assert.Equal(OverlayPosition.TopCenter, loaded.Position);
+            Assert.Equal(0, loaded.PositionCoordinatesVersion);
         }
         finally
         {
@@ -153,8 +186,8 @@ public class SettingsTests
             Opacity = 0,
             BackgroundColor = "not-a-color",
             TextColor = "#nothex",
-            HorizontalOffsetX = -900,
-            VerticalOffsetY = 5000
+            HorizontalOffsetX = -15000,
+            VerticalOffsetY = 15000
         };
 
         settings.Validate();
@@ -164,7 +197,7 @@ public class SettingsTests
         Assert.Equal(0.3, settings.Opacity);
         Assert.Equal("#111720", settings.BackgroundColor);
         Assert.Equal("#F2F4F7", settings.TextColor);
-        Assert.Equal(-200, settings.HorizontalOffsetX);
-        Assert.Equal(1000, settings.VerticalOffsetY);
+        Assert.Equal(-10_000, settings.HorizontalOffsetX);
+        Assert.Equal(10_000, settings.VerticalOffsetY);
     }
 }

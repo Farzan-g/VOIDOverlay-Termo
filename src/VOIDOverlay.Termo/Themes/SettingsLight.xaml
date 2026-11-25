@@ -1,0 +1,24 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="SettingsWindowBrush" Color="#FFF3F5F8" />
+    <SolidColorBrush x:Key="SettingsCardBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="SettingsForegroundBrush" Color="#FF18212B" />
+    <SolidColorBrush x:Key="SettingsSecondaryBrush" Color="#FF4C5968" />
+    <SolidColorBrush x:Key="SettingsAccentBrush" Color="#FF006B63" />
+    <SolidColorBrush x:Key="SettingsControlBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="SettingsControlForegroundBrush" Color="#FF18212B" />
+    <SolidColorBrush x:Key="SettingsBorderBrush" Color="#FF8995A3" />
+    <SolidColorBrush x:Key="SettingsSelectedBrush" Color="#FFD0EAE7" />
+    <SolidColorBrush x:Key="SettingsFocusBorderBrush" Color="#FF007F78" />
+    <SolidColorBrush x:Key="SettingsDisabledControlBrush" Color="#FFE9EDF1" />
+    <SolidColorBrush x:Key="SettingsDisabledForegroundBrush" Color="#FF586574" />
+    <SolidColorBrush x:Key="SettingsPopupBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="SettingsPopupForegroundBrush" Color="#FF18212B" />
+    <SolidColorBrush x:Key="SettingsPopupHoverBrush" Color="#FFE5F3F2" />
+    <SolidColorBrush x:Key="SettingsPopupSelectedBrush" Color="#FFD0EAE7" />
+    <SolidColorBrush x:Key="SettingsButtonHoverBrush" Color="#FFE7F0F0" />
+    <SolidColorBrush x:Key="SettingsButtonPressedBrush" Color="#FFD5E3E2" />
+    <SolidColorBrush x:Key="SettingsSliderTrackBrush" Color="#FFBEC8D2" />
+    <SolidColorBrush x:Key="SettingsSliderThumbBrush" Color="#FF007F78" />
+    <SolidColorBrush x:Key="SettingsScrollThumbBrush" Color="#FF8995A3" />
+</ResourceDictionary>

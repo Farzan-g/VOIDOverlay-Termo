@@ -65,6 +65,48 @@ public sealed class MainViewModelTelemetryTests
     }
 
     [Fact]
+    public void DisabledMetricIsNotSampledOrAddedToItsGraph()
+    {
+        using var fixture = new ViewModelFixture(new OverlaySettings
+        {
+            ShowCpuTemperature = false,
+            ShowCpuGraph = false,
+            ShowGpuTemperature = true,
+            ShowGpuGraph = false
+        });
+
+        fixture.Monitor.Publish(new HardwareReading { CpuTemperatureC = 80, GpuTemperatureC = 65 });
+
+        Assert.False(fixture.Monitor.CpuSamplingEnabled);
+        Assert.True(fixture.Monitor.GpuSamplingEnabled);
+        Assert.Null(fixture.ViewModel.CpuTemperatureC);
+        Assert.Empty(fixture.ViewModel.CpuHistory);
+        Assert.Equal(65, fixture.ViewModel.GpuTemperatureC);
+        Assert.Empty(fixture.ViewModel.GpuHistory);
+    }
+
+    [Fact]
+    public void GraphCanBeEnabledWithoutDisplayingItsTemperature()
+    {
+        using var fixture = new ViewModelFixture(new OverlaySettings
+        {
+            ShowCpuTemperature = false,
+            ShowCpuGraph = true,
+            ShowGpuTemperature = false,
+            ShowGpuGraph = false
+        });
+
+        fixture.Monitor.Publish(new HardwareReading { CpuTemperatureC = 57.5, GpuTemperatureC = 65 });
+
+        Assert.True(fixture.Monitor.CpuSamplingEnabled);
+        Assert.False(fixture.Monitor.GpuSamplingEnabled);
+        Assert.Null(fixture.ViewModel.CpuTemperatureC);
+        Assert.Equal(new double?[] { 57.5 }, fixture.ViewModel.CpuHistory);
+        Assert.Null(fixture.ViewModel.GpuTemperatureC);
+        Assert.Empty(fixture.ViewModel.GpuHistory);
+    }
+
+    [Fact]
     public void UnavailableAndInvalidReadingsRemainVisibleAsNaAndDoNotAddGraphSamples()
     {
         using var fixture = new ViewModelFixture();
@@ -174,8 +216,16 @@ public sealed class MainViewModelTelemetryTests
         public event EventHandler<HardwareReading>? ReadingUpdated;
         public int LastStartedInterval { get; private set; }
         public int SensorEnumerationThreadId { get; private set; }
+        public bool CpuSamplingEnabled { get; private set; } = true;
+        public bool GpuSamplingEnabled { get; private set; } = true;
 
         public HardwareReading GetLatestReading() => _latest;
+
+        public void SetMetricVisibility(bool showCpu, bool showGpu)
+        {
+            CpuSamplingEnabled = showCpu;
+            GpuSamplingEnabled = showGpu;
+        }
 
         public void Start(int intervalMs = 1000) => LastStartedInterval = intervalMs;
 

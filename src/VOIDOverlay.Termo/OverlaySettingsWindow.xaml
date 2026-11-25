@@ -3,118 +3,198 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="VOID Overlay Termo Settings"
         Icon="pack://application:,,,/assets/void-overlay.ico"
-        Width="480"
-        Height="660"
-        MinWidth="420"
-        MinHeight="520"
-        WindowStartupLocation="CenterOwner"
+        Width="560"
+        Height="760"
+        MinWidth="500"
+        MinHeight="560"
+        WindowStartupLocation="CenterScreen"
         ShowInTaskbar="False"
         ResizeMode="CanResizeWithGrip"
-        Background="#111720"
-        Foreground="#F2F4F7"
+        Background="{DynamicResource SettingsWindowBrush}"
+        Foreground="{DynamicResource SettingsForegroundBrush}"
         FontFamily="Segoe UI">
-    <Grid Margin="20">
+    <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <StackPanel Margin="0,0,0,14">
-            <TextBlock Text="VOID OVERLAY TERMO" FontSize="11" FontWeight="Bold" Foreground="#4DE3D2" />
-            <TextBlock Text="Settings" FontSize="24" FontWeight="SemiBold" />
+        <StackPanel Margin="0,0,0,16">
+            <TextBlock Text="VOID OVERLAY  /  TERMO" FontSize="11" FontWeight="Bold"
+                       Foreground="{DynamicResource SettingsAccentBrush}" />
+            <TextBlock Text="Settings" FontSize="26" FontWeight="SemiBold" Margin="0,3,0,0" />
+            <TextBlock Text="Personalize your temperature overlay." Margin="0,3,0,0"
+                       Foreground="{DynamicResource SettingsSecondaryBrush}" />
         </StackPanel>
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="False">
             <StackPanel>
-                <TextBlock Text="GENERAL" Foreground="#FFAE5C" FontWeight="Bold" Margin="0,4,0,8" />
-                <CheckBox x:Name="StartupCheck" Content="Start with Windows" Margin="0,4" />
-                <CheckBox x:Name="TopmostCheck" Content="Keep overlay on top" Margin="0,4" />
-                <CheckBox x:Name="LockedCheck" Content="Lock position" Margin="0,4" />
-                <CheckBox x:Name="ClickThroughCheck" Content="Click through overlay" Margin="0,4" />
-                <CheckBox x:Name="StartVisibleCheck" Content="Show overlay at launch" Margin="0,4" />
+                <Border Background="{DynamicResource SettingsCardBrush}" CornerRadius="8"
+                        Padding="16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="GENERAL" FontSize="12" FontWeight="Bold"
+                                   Foreground="{DynamicResource SettingsAccentBrush}" Margin="0,0,0,8" />
+                        <CheckBox x:Name="StartupCheck" Content="Start with Windows" />
+                        <CheckBox x:Name="StartVisibleCheck" Content="Show overlay at launch" />
+                        <CheckBox x:Name="TopmostCheck" Content="Keep overlay on top" />
+                        <CheckBox x:Name="LockedCheck" Content="Lock position" />
+                        <CheckBox x:Name="ClickThroughCheck" Content="Click through overlay" />
+                        <TextBlock Text="Settings appearance" Margin="0,8,0,3" />
+                        <ComboBox x:Name="ThemeCombo" SelectedValuePath="Tag">
+                            <ComboBoxItem Content="System" Tag="System" />
+                            <ComboBoxItem Content="Light" Tag="Light" />
+                            <ComboBoxItem Content="Dark" Tag="Dark" />
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
 
-                <TextBlock Text="APPEARANCE" Foreground="#FFAE5C" FontWeight="Bold" Margin="0,18,0,8" />
-                <CheckBox x:Name="BackgroundEnabledCheck" Content="Show background" Margin="0,4" />
-                <TextBlock Text="Background color (#RRGGBB)" Margin="0,8,0,3" />
-                <TextBox x:Name="BackgroundColorBox" Width="120" HorizontalAlignment="Left" />
-                <TextBlock Text="Background opacity" Margin="0,8,0,3" />
-                <Slider x:Name="BackgroundOpacitySlider" Minimum="0" Maximum="1" TickFrequency="0.05"
-                        IsSnapToTickEnabled="True" />
-                <TextBlock Text="Overlay opacity" Margin="0,8,0,3" />
-                <Slider x:Name="OverlayOpacitySlider" Minimum="0.3" Maximum="1" TickFrequency="0.05"
-                        IsSnapToTickEnabled="True" />
-                <TextBlock Text="Text color (#RRGGBB)" Margin="0,8,0,3" />
-                <TextBox x:Name="TextColorBox" Width="120" HorizontalAlignment="Left" />
-                <TextBlock Text="Primary accent color (#RRGGBB)" Margin="0,8,0,3" />
-                <TextBox x:Name="AccentColorBox" Width="120" HorizontalAlignment="Left" />
-                <TextBlock Text="Secondary accent color (#RRGGBB)" Margin="0,8,0,3" />
-                <TextBox x:Name="SecondaryAccentColorBox" Width="120" HorizontalAlignment="Left" />
-                <TextBlock Text="Font size" Margin="0,8,0,3" />
-                <Slider x:Name="FontSizeSlider" Minimum="9" Maximum="24" TickFrequency="1"
-                        IsSnapToTickEnabled="True" />
-                <TextBlock Text="Colors accept six-digit hex values. Font size is measured in DIPs."
-                           TextWrapping="Wrap" Foreground="#B9C3D0" Margin="0,4,0,0" />
+                <Border Background="{DynamicResource SettingsCardBrush}" CornerRadius="8"
+                        Padding="16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="POSITION" FontSize="12" FontWeight="Bold"
+                                   Foreground="{DynamicResource SettingsAccentBrush}" Margin="0,0,0,8" />
+                        <TextBlock Text="Position preset" />
+                        <ComboBox x:Name="PositionCombo" SelectedValuePath="Tag"
+                                  SelectionChanged="PositionPresetChanged">
+                            <ComboBoxItem Content="Top Left" Tag="TopLeft" />
+                            <ComboBoxItem Content="Top Center" Tag="TopCenter" />
+                            <ComboBoxItem Content="Top Right" Tag="TopRight" />
+                            <ComboBoxItem Content="Center Left" Tag="CenterLeft" />
+                            <ComboBoxItem Content="Center" Tag="Center" />
+                            <ComboBoxItem Content="Center Right" Tag="CenterRight" />
+                            <ComboBoxItem Content="Bottom Left" Tag="BottomLeft" />
+                            <ComboBoxItem Content="Bottom Center" Tag="BottomCenter" />
+                            <ComboBoxItem Content="Bottom Right" Tag="BottomRight" />
+                        </ComboBox>
+                        <TextBlock Text="Display" Margin="0,10,0,3" />
+                        <ComboBox x:Name="MonitorCombo" DisplayMemberPath="Name"
+                                  SelectionChanged="MonitorChanged" />
+                        <TextBlock Text="Usable area" Margin="0,10,0,3" />
+                        <ComboBox x:Name="EdgeReferenceCombo" SelectionChanged="BoundsChanged">
+                            <ComboBoxItem Content="Work area" Tag="WorkArea" />
+                            <ComboBoxItem Content="Full screen" Tag="FullScreen" />
+                        </ComboBox>
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Horizontal offset (DIPs)" />
+                                <Slider x:Name="OffsetXSlider" Minimum="-100" Maximum="100"
+                                        IsMoveToPointEnabled="True" />
+                            </StackPanel>
+                            <TextBox x:Name="OffsetXBox" Grid.Column="1" Width="84" Margin="12,19,0,0"
+                                     VerticalContentAlignment="Center"
+                                     LostFocus="OffsetTextChanged" KeyDown="OffsetKeyDown" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Vertical offset (DIPs)" />
+                                <Slider x:Name="OffsetYSlider" Minimum="-100" Maximum="100"
+                                        IsMoveToPointEnabled="True" />
+                            </StackPanel>
+                            <TextBox x:Name="OffsetYBox" Grid.Column="1" Width="84" Margin="12,19,0,0"
+                                     VerticalContentAlignment="Center"
+                                     LostFocus="OffsetTextChanged" KeyDown="OffsetKeyDown" />
+                        </Grid>
+                        <TextBlock Text="Zero centers the overlay on the selected display. Positive values move right and down."
+                                   TextWrapping="Wrap" Margin="0,5,0,0"
+                                   Foreground="{DynamicResource SettingsSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
 
-                <TextBlock Text="POSITION" Foreground="#FFAE5C" FontWeight="Bold" Margin="0,18,0,8" />
-                <StackPanel x:Name="PositionControls">
-                    <TextBlock Text="Anchor" />
-                    <ComboBox x:Name="PositionComboBox" Margin="0,4,0,8" />
-                    <TextBlock Text="Edge reference" />
-                    <ComboBox x:Name="EdgeReferenceComboBox" Margin="0,4,0,8">
-                        <ComboBoxItem Content="Work Area" Tag="WorkArea" />
-                        <ComboBoxItem Content="Full Screen" Tag="FullScreen" />
-                    </ComboBox>
-                    <TextBlock Text="Monitor follows the overlay; the primary display is used if unavailable."
-                               TextWrapping="Wrap" Foreground="#B9C3D0" Margin="0,0,0,8" />
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="X offset (DIPs)" />
-                            <Slider x:Name="OffsetXSlider" Minimum="-200" Maximum="1000" TickFrequency="10"
-                                    IsSnapToTickEnabled="False" />
-                        </StackPanel>
-                        <TextBox x:Name="OffsetXBox" Grid.Column="1" Width="80" Margin="10,18,0,0" />
-                    </Grid>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="Y offset (DIPs)" />
-                            <Slider x:Name="OffsetYSlider" Minimum="-200" Maximum="1000" TickFrequency="10"
-                                    IsSnapToTickEnabled="False" />
-                        </StackPanel>
-                        <TextBox x:Name="OffsetYBox" Grid.Column="1" Width="80" Margin="10,18,0,0" />
-                    </Grid>
-                    <TextBlock Text="Positive X moves right; positive Y moves down. Position stays on-screen."
-                               TextWrapping="Wrap" Foreground="#B9C3D0" Margin="0,4,0,0" />
-                </StackPanel>
+                <Border Background="{DynamicResource SettingsCardBrush}" CornerRadius="8"
+                        Padding="16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="METRICS" FontSize="12" FontWeight="Bold"
+                                   Foreground="{DynamicResource SettingsAccentBrush}" Margin="0,0,0,8" />
+                        <CheckBox x:Name="CpuTemperatureCheck" Content="CPU temperature" />
+                        <CheckBox x:Name="GpuTemperatureCheck" Content="GPU temperature" />
+                        <CheckBox x:Name="CpuGraphCheck" Content="CPU graph" />
+                        <CheckBox x:Name="GpuGraphCheck" Content="GPU graph" />
+                        <TextBlock Text="Update interval" Margin="0,8,0,3" />
+                        <ComboBox x:Name="IntervalCombo" SelectedValuePath="Tag">
+                            <ComboBoxItem Content="250 ms" Tag="250" />
+                            <ComboBoxItem Content="500 ms" Tag="500" />
+                            <ComboBoxItem Content="750 ms" Tag="750" />
+                            <ComboBoxItem Content="1 second" Tag="1000" />
+                            <ComboBoxItem Content="2 seconds" Tag="2000" />
+                            <ComboBoxItem Content="5 seconds" Tag="5000" />
+                        </ComboBox>
+                        <TextBlock Text="Each temperature and its history graph can be shown independently."
+                                   TextWrapping="Wrap" Margin="0,6,0,0"
+                                   Foreground="{DynamicResource SettingsSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
 
-                <TextBlock Text="MONITORING" Foreground="#FFAE5C" FontWeight="Bold" Margin="0,18,0,8" />
-                <TextBlock Text="Sampling interval" />
-                <ComboBox x:Name="IntervalComboBox" Width="150" HorizontalAlignment="Left" Margin="0,4,0,0"
-                          SelectedValuePath="Tag">
-                    <ComboBoxItem Content="250 ms" Tag="250" />
-                    <ComboBoxItem Content="500 ms" Tag="500" />
-                    <ComboBoxItem Content="750 ms" Tag="750" />
-                    <ComboBoxItem Content="1000 ms" Tag="1000" />
-                    <ComboBoxItem Content="2000 ms" Tag="2000" />
-                    <ComboBoxItem Content="5000 ms" Tag="5000" />
-                </ComboBox>
-                <TextBlock Text="CPU and GPU temperatures are selected from sensors exposed by the device and driver."
-                           TextWrapping="Wrap" Foreground="#B9C3D0" Margin="0,6,0,0" />
+                <Border Background="{DynamicResource SettingsCardBrush}" CornerRadius="8"
+                        Padding="16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="APPEARANCE" FontSize="12" FontWeight="Bold"
+                                   Foreground="{DynamicResource SettingsAccentBrush}" Margin="0,0,0,8" />
+                        <CheckBox x:Name="BackgroundEnabledCheck" Content="Show overlay background" />
+                        <TextBlock Text="Background color (#RRGGBB)" Margin="0,8,0,3" />
+                        <TextBox x:Name="BackgroundColorBox" MaxLength="7" />
+                        <TextBlock Text="Background opacity" Margin="0,8,0,0" />
+                        <Slider x:Name="BackgroundOpacitySlider" Minimum="0" Maximum="1"
+                                TickFrequency="0.05" IsSnapToTickEnabled="True" />
+                        <TextBlock Text="Overlay opacity" Margin="0,8,0,0" />
+                        <Slider x:Name="OverlayOpacitySlider" Minimum="0.3" Maximum="1"
+                                TickFrequency="0.05" IsSnapToTickEnabled="True" />
+                        <TextBlock Text="Text color (#RRGGBB)" Margin="0,8,0,3" />
+                        <TextBox x:Name="TextColorBox" MaxLength="7" />
+                        <TextBlock Text="CPU accent color (#RRGGBB)" Margin="0,8,0,3" />
+                        <TextBox x:Name="AccentColorBox" MaxLength="7" />
+                        <TextBlock Text="GPU accent color (#RRGGBB)" Margin="0,8,0,3" />
+                        <TextBox x:Name="SecondaryAccentColorBox" MaxLength="7" />
+                        <TextBlock Text="Font family" Margin="0,8,0,3" />
+                        <ComboBox x:Name="FontFamilyCombo" SelectedValuePath="Tag">
+                            <ComboBoxItem Content="Segoe UI" Tag="Segoe UI" />
+                            <ComboBoxItem Content="Arial" Tag="Arial" />
+                            <ComboBoxItem Content="Consolas" Tag="Consolas" />
+                        </ComboBox>
+                        <TextBlock Text="Font size" Margin="0,8,0,0" />
+                        <Slider x:Name="FontSizeSlider" Minimum="9" Maximum="24"
+                                TickFrequency="1" IsSnapToTickEnabled="True" />
+                        <TextBlock Text="Text readability" Margin="0,8,0,3" />
+                        <ComboBox x:Name="ReadabilityCombo" SelectedValuePath="Tag">
+                            <ComboBoxItem Content="Normal" Tag="Normal" />
+                            <ComboBoxItem Content="Shadow" Tag="Shadow" />
+                            <ComboBoxItem Content="Outline" Tag="Outline" />
+                            <ComboBoxItem Content="High contrast" Tag="HighContrast" />
+                        </ComboBox>
+                        <TextBlock Text="Metric spacing" Margin="0,8,0,0" />
+                        <Slider x:Name="MetricSpacingSlider" Minimum="0" Maximum="24"
+                                TickFrequency="1" IsSnapToTickEnabled="True" />
+                        <TextBlock Text="Overlay padding" Margin="0,8,0,0" />
+                        <Slider x:Name="OverlayPaddingSlider" Minimum="0" Maximum="32"
+                                TickFrequency="1" IsSnapToTickEnabled="True" />
+                        <TextBlock Text="Background and text readability are independent; readable text also works on a transparent overlay."
+                                   TextWrapping="Wrap" Margin="0,6,0,0"
+                                   Foreground="{DynamicResource SettingsSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
 
-                <TextBlock Text="ABOUT" Foreground="#FFAE5C" FontWeight="Bold" Margin="0,18,0,8" />
-                <TextBlock Text="VOID Overlay Termo displays temperature readings and short sensor history. Unavailable readings appear as N/A."
-                           TextWrapping="Wrap" Foreground="#B9C3D0" />
+                <Border Background="{DynamicResource SettingsCardBrush}" CornerRadius="8"
+                        Padding="16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="ABOUT" FontSize="12" FontWeight="Bold"
+                                   Foreground="{DynamicResource SettingsAccentBrush}" Margin="0,0,0,8" />
+                        <TextBlock Text="Termo displays CPU and GPU temperature readings with independent short-history graphs. Unavailable readings appear as N/A."
+                                   TextWrapping="Wrap" Foreground="{DynamicResource SettingsSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
-        <DockPanel Grid.Row="2" Margin="0,12,0,0">
-            <Button Content="Reset to Defaults" Click="Reset_Click" HorizontalAlignment="Left" Padding="12,6" />
-            <Button Content="Done" Click="Done_Click" HorizontalAlignment="Right" Padding="18,6" />
+        <DockPanel Grid.Row="2" Margin="0,14,0,0">
+            <Button Content="Reset to defaults" Click="Reset_Click" HorizontalAlignment="Left" />
+            <Button Content="Done" Click="Done_Click" HorizontalAlignment="Right" />
         </DockPanel>
     </Grid>
 </Window>
